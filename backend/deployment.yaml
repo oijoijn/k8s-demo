@@ -1,3 +1,4 @@
+# backend/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,15 +13,18 @@ spec:
       labels: {app: api}
     spec:
       serviceAccountName: api-sa
+      # ▼▼▼ [修正] Podレベルのセキュリティ設定を強化 ▼▼▼
       securityContext:
+        runAsNonRoot: true # Pod内の全コンテナに非root実行を強制
         seccompProfile:
           type: RuntimeDefault
+      # ▲▲▲ 修正 ▲▲▲
       containers:
       - name: api
         image: ghcr.io/example/go-api:latest # ←ビルドしたものに置換
         ports: [{containerPort: 8080}]
         env:
-          - name: DB_HOST   # CoreDNS で `mysql.app-demo.svc.cluster.local`
+          - name: DB_HOST
             value: mysql
           - name: DB_USER
             valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_USER}}
@@ -39,7 +43,12 @@ spec:
           httpGet: {path: /healthz, port: 8080}
           initialDelaySeconds: 15
           periodSeconds: 10
+        # ▼▼▼ [修正] コンテナレベルのセキュリティ設定を修正 ▼▼▼
         securityContext:
-          # runAsNonRoot: true
+          runAsNonRoot: true
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
+          # restrictedポリシーを満たすためにcapabilitiesを追加
+          capabilities:
+            drop: ["ALL"]
+        # ▲▲▲ 修正 ▲▲▲

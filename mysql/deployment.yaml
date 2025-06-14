@@ -5,23 +5,38 @@ metadata:
   name: mysql
   namespace: app-demo
 spec:
-  # ▼▼▼ 追加 ▼▼▼
+  # ▼▼▼ [修正] StatefulSetに必要な設定を追加 ▼▼▼
   serviceName: mysql
-  # ▲▲▲ 追加 ▲▲▲
-  selector: # selectorをspec直下に移動（インデント修正）
+  # ▲▲▲ 修正 ▲▲▲
+  selector:
     matchLabels: {app: mysql}
   template:
     metadata:
       labels: {app: mysql}
     spec:
+      # ▼▼▼ [修正] Podレベルのセキュリティ設定を修正 ▼▼▼
       securityContext:
         seccompProfile:
           type: RuntimeDefault
-        fsGroup: 999
+        fsGroup: 999 # ボリュームをmysqlグループに設定
+      # ▲▲▲ 修正 ▲▲▲
+      # ▼▼▼ [修正] initContainerを追加 ▼▼▼
+      # メインコンテナの起動前に、root権限でデータディレクトリの所有権をmysqlユーザー(999)に変更します。
+      # これにより、メインコンテナは非rootユーザーで起動できるようになります。
+      initContainers:
+      - name: init-mysql
+        image: busybox:1.36
+        command: ['sh', '-c', 'chown -R 999:999 /var/lib/mysql']
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+        securityContext:
+          runAsUser: 0 # rootとして実行
+      # ▲▲▲ 修正 ▲▲▲
       containers:
       - name: mysql
         image: mysql:8.4
-        # ▼▼▼ 修正 ▼▼▼
+        # ▼▼▼ [修正] 環境変数、Probe、セキュリティ設定を追加 ▼▼▼
         env:
           - name: MYSQL_ROOT_PASSWORD
             valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_ROOT_PASSWORD}}
@@ -31,24 +46,32 @@ spec:
             valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_USER}}
           - name: MYSQL_PASSWORD
             valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_PASSWORD}}
+        ports:
+          - containerPort: 3306
+        livenessProbe:
+          exec:
+            command: ["mysqladmin", "ping", "-h", "127.0.0.1", "--password=$(MYSQL_ROOT_PASSWORD)"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command: ["mysql", "-h", "127.0.0.1", "-p$(MYSQL_ROOT_PASSWORD)", "-e", "SELECT 1"]
+          initialDelaySeconds: 5
+          periodSeconds: 2
+          timeoutSeconds: 1
         securityContext:
-          # runAsNonRoot: true # ← まずはコメントアウトして起動を確認
+          runAsUser: 999 # mysqlユーザーとして実行
+          runAsNonRoot: true
           allowPrivilegeEscalation: false
           capabilities:
             drop: ["ALL"]
           seccompProfile:
             type: RuntimeDefault
         # ▲▲▲ 修正 ▲▲▲
-        ports:
-          - containerPort: 3306
-        # ▼▼▼ 追加 ▼▼▼
-        readinessProbe:
-          exec:
-            command: ["mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "--password=$(MYSQL_ROOT_PASSWORD)"]
-          initialDelaySeconds: 15
-          periodSeconds: 5
-          timeoutSeconds: 2
-        # ▲▲▲ 追加 ▲▲▲
+        volumeMounts:
+          - name: data
+            mountPath: /var/lib/mysql
   volumeClaimTemplates:
     - metadata:
         name: data

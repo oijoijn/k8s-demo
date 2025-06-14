@@ -1,4 +1,4 @@
-# mysql/deployment.yaml  ★フル定義
+# frontend/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,25 +12,27 @@ spec:
     metadata:
       labels: {app: web}
     spec:
-      # ▼▼▼ 追加 ▼▼▼
+      # ▼▼▼ [修正] Podレベルのセキュリティ設定を追加 ▼▼▼
+      # これにより、このPodで実行される全コンテナが非rootユーザーで実行されるようになります。
       securityContext:
-        runAsUser: 101       # nginxユーザーのUID
-        runAsGroup: 101      # nginxグループのGID
+        runAsUser: 101
+        runAsGroup: 101
         fsGroup: 101
         seccompProfile:
           type: RuntimeDefault
-      # ▲▲▲ 追加 ▲▲▲
+      # ▲▲▲ 修正 ▲▲▲
       containers:
         - name: nginx
           image: nginx:1.27
           ports: [{containerPort: 80}]
-          # ▼▼▼ 追加 ▼▼▼
+          # ▼▼▼ [修正] コンテナレベルのセキュリティ設定を追加 ▼▼▼
+          # restrictedポリシーの要件を明示的に満たします。
           securityContext:
             allowPrivilegeEscalation: false
-            # runAsNonRoot: true
+            runAsNonRoot: true
             capabilities:
               drop: ["ALL"]
-          # ▲▲▲ 追加 ▲▲▲
+          # ▲▲▲ 修正 ▲▲▲
           volumeMounts:
             - name: conf
               mountPath: /etc/nginx/conf.d

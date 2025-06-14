@@ -1,38 +1,63 @@
-# mysql/deployment.yaml
+# mysql/deployment.yaml  ★フル定義
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: mysql
   namespace: app-demo
 spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
   template:
     metadata:
-      labels: {app: mysql}
+      labels:
+        app: mysql
     spec:
-      # Pod 全体の seccomp
+      # ★ Pod レベルの seccomp
       securityContext:
         seccompProfile:
           type: RuntimeDefault
-        fsGroup: 999        # 既存
+        fsGroup: 999
       containers:
-      - name: mysql
-        image: mysql:8.4
-        # ↓ Container 単位の追加設定
-        securityContext:
-          runAsNonRoot: true
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]   # “restricted” で必須
-          seccompProfile:
-            type: RuntimeDefault
-        ports:
-          - containerPort: 3306
-          initialDelaySeconds: 10
-          periodSeconds: 5
+        - name: mysql               # ← ここに必ず "- "
+          image: mysql:8.4
+          args: ["--default-authentication-plugin=mysql_native_password"]
+          envFrom:
+            - secretRef:
+                name: mysql-secret
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # ★ Container レベルの securityContext
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          readinessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes: []   # ← volumeClaimTemplates を使用するので空配列で OK
   volumeClaimTemplates:
     - metadata:
         name: data
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:
-          requests: {storage: 5Gi}
+          requests:
+            storage: 5Gi

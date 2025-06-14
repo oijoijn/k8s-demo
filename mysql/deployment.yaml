@@ -1,63 +1,58 @@
-# mysql/deployment.yaml  ★フル定義
+# mysql/deployment.yaml
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: mysql
   namespace: app-demo
 spec:
+  # ▼▼▼ 追加 ▼▼▼
   serviceName: mysql
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mysql
+  # ▲▲▲ 追加 ▲▲▲
+  selector: # selectorをspec直下に移動（インデント修正）
+    matchLabels: {app: mysql}
   template:
     metadata:
-      labels:
-        app: mysql
+      labels: {app: mysql}
     spec:
-      # ★ Pod レベルの seccomp
       securityContext:
         seccompProfile:
           type: RuntimeDefault
         fsGroup: 999
       containers:
-        - name: mysql               # ← ここに必ず "- "
-          image: mysql:8.4
-          args: ["--default-authentication-plugin=mysql_native_password"]
-          envFrom:
-            - secretRef:
-                name: mysql-secret
-          ports:
-            - containerPort: 3306
-          volumeMounts:
-            - name: data
-              mountPath: /var/lib/mysql
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-          # ★ Container レベルの securityContext
-          securityContext:
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-            seccompProfile:
-              type: RuntimeDefault
-          readinessProbe:
-            tcpSocket:
-              port: 3306
-            initialDelaySeconds: 10
-            periodSeconds: 5
-      volumes: []   # ← volumeClaimTemplates を使用するので空配列で OK
+      - name: mysql
+        image: mysql:8.4
+        # ▼▼▼ 修正 ▼▼▼
+        env:
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_ROOT_PASSWORD}}
+          - name: MYSQL_DATABASE
+            valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_DATABASE}}
+          - name: MYSQL_USER
+            valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_USER}}
+          - name: MYSQL_PASSWORD
+            valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_PASSWORD}}
+        securityContext:
+          # runAsNonRoot: true # ← まずはコメントアウトして起動を確認
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
+        # ▲▲▲ 修正 ▲▲▲
+        ports:
+          - containerPort: 3306
+        # ▼▼▼ 追加 ▼▼▼
+        readinessProbe:
+          exec:
+            command: ["mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "--password=$(MYSQL_ROOT_PASSWORD)"]
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 2
+        # ▲▲▲ 追加 ▲▲▲
   volumeClaimTemplates:
     - metadata:
         name: data
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:
-          requests:
-            storage: 5Gi
+          requests: {storage: 5Gi}

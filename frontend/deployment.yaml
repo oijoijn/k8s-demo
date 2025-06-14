@@ -27,7 +27,7 @@ spec:
           # ▼▼▼ 追加 ▼▼▼
           securityContext:
             allowPrivilegeEscalation: false
-            runAsNonRoot: true
+            # runAsNonRoot: true
             capabilities:
               drop: ["ALL"]
           # ▲▲▲ 追加 ▲▲▲

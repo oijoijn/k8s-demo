@@ -1,0 +1,14 @@
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+  namespace: app-demo
+data:
+  default.conf: |
+    server {
+        listen 80;
+        location / {
+            proxy_pass http://api.app-demo.svc.cluster.local;
+        }
+    }

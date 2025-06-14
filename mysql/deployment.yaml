@@ -1,0 +1,38 @@
+# mysql/deployment.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: app-demo
+spec:
+  template:
+    metadata:
+      labels: {app: mysql}
+    spec:
+      # Pod 全体の seccomp
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        fsGroup: 999        # 既存
+      containers:
+      - name: mysql
+        image: mysql:8.4
+        # ↓ Container 単位の追加設定
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]   # “restricted” で必須
+          seccompProfile:
+            type: RuntimeDefault
+        ports:
+          - containerPort: 3306
+          initialDelaySeconds: 10
+          periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: {storage: 5Gi}

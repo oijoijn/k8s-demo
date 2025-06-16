@@ -13,12 +13,10 @@ spec:
       labels: {app: api}
     spec:
       serviceAccountName: api-sa
-      # ▼▼▼ [修正] Podレベルのセキュリティ設定を強化 ▼▼▼
       securityContext:
         runAsNonRoot: true # Pod内の全コンテナに非root実行を強制
         seccompProfile:
           type: RuntimeDefault
-      # ▲▲▲ 修正 ▲▲▲
       containers:
       - name: api
         image: ghcr.io/example/go-api:latest # ←ビルドしたものに置換
@@ -43,12 +41,9 @@ spec:
           httpGet: {path: /healthz, port: 8080}
           initialDelaySeconds: 15
           periodSeconds: 10
-        # ▼▼▼ [修正] コンテナレベルのセキュリティ設定を修正 ▼▼▼
         securityContext:
           runAsNonRoot: true
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
-          # restrictedポリシーを満たすためにcapabilitiesを追加
           capabilities:
             drop: ["ALL"]
-        # ▲▲▲ 修正 ▲▲▲

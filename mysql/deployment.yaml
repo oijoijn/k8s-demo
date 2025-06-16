@@ -12,9 +12,10 @@ spec:
     metadata:
       labels: {app: mysql}
     spec:
-      # ▼▼▼ [修正] Podレベルのセキュリティ設定 ▼▼▼
-      # fsGroupを設定することで、マウントしたボリュームをmysqlグループ(999)が
-      # 書き込み可能になります。これによりinitContainerが不要になります。
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mysql-pvc # 作成したPVCの名前を指定
       securityContext:
         runAsUser: 999
         runAsGroup: 999
@@ -22,8 +23,6 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
-      # ▲▲▲ 修正 ▲▲▲
-      # --- initContainers ブロックは完全に削除 ---
       containers:
       - name: mysql
         image: mysql:8.4
@@ -50,22 +49,12 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 5
           timeoutSeconds: 2
-        # ▼▼▼ [修正] コンテナレベルのセキュリティ設定 ▼▼▼
-        # Podレベルで指定したユーザーで実行し、権限昇格などを禁止します。
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
             drop: ["ALL"]
           seccompProfile:
             type: RuntimeDefault
-        # ▲▲▲ 修正 ▲▲▲
         volumeMounts:
-          - name: data
+          - name: data # ここで指定するnameは上のvolumesで定義したnameと一致させる
             mountPath: /var/lib/mysql
-  volumeClaimTemplates:
-    - metadata:
-        name: data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests: {storage: 5Gi}

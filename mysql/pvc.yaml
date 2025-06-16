@@ -1,11 +1,13 @@
-
+# mysql/pvc.yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: mysql-pvc
   namespace: app-demo
 spec:
-  accessModes: ["ReadWriteOnce"]
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
   resources:
     requests:
       storage: 5Gi

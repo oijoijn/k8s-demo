@@ -9,7 +9,7 @@ elif [ $1 = "d" ]; then
 elif [ $1 = "p" ]; then
     echo 'port-forward'
     kubectl port-forward service/web -n app-demo 8080:80
-elif [ $1 = "k" ]; then
+elif [ $1 = "a" ]; then
     echo 'kubectl apply'
     kubectl apply -f namespace.yaml
     kubectl apply -f secrets.yaml
